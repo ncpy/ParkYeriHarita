@@ -1,7 +1,9 @@
 package com.example.parkyeriharita;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.core.app.ActivityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.FragmentActivity;
 
 import android.Manifest;
@@ -9,13 +11,13 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
@@ -25,6 +27,7 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.SearchView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -38,7 +41,8 @@ import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
-import com.google.common.primitives.Ints;
+import com.google.android.material.navigation.NavigationView;
+import com.google.common.primitives.Doubles;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
@@ -55,13 +59,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private GoogleMap mMap;
     android.widget.SearchView search_bar;
+
+    DrawerLayout drawerLayout;
+    NavigationView navView;
+    ActionBarDrawerToggle actionBarDrawerToggle;
+
     MyAdapter myAdapter;
     ListView listView;
     List<MyItems> listItems = new ArrayList<>();
     MyItems myItems1, myItems2;
     String park_adi, park_saat;
     int park_bos_sayi, park_fiyat;
-    LinkedHashMap<String[], LinkedHashMap<String, Integer>> park_list = new LinkedHashMap<>();
+    LinkedHashMap<String[], LinkedHashMap<String, Double>> park_list = new LinkedHashMap<>();
     LinkedHashMap<String, LatLng> list_latlng;
     Context context = this;
 
@@ -73,6 +82,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        drawerLayout = findViewById(R.id.drawerlayout);
+        actionBarDrawerToggle = new ActionBarDrawerToggle(this, drawerLayout, R.string.open, R.string.close);
+        drawerLayout.addDrawerListener(actionBarDrawerToggle);
+        actionBarDrawerToggle.syncState();
+
+        //getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+
+        navView = findViewById(R.id.navView);
+        navView.setItemIconTintList(null);
+        navView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                if (item.getItemId() == R.id.item_share) {
+                    Intent share = new Intent(Intent.ACTION_SEND);
+                    share.setType("text/plain");
+                    share.putExtra(Intent.EXTRA_TEXT, "merhaba"); // uyg. adresi (googlePlay)
+                    startActivity(Intent.createChooser(share, "Gönderiyi paylaş !! "));
+                } else if (item.getItemId() == R.id.item_rate)
+                    Toast.makeText(getApplicationContext(), "..to Google Play", Toast.LENGTH_SHORT).show();
+
+                return true;
+            }
+        });
+
 
         search_bar = findViewById(R.id.search_bar);
         search_bar.setFocusable(false);
@@ -114,7 +148,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                                     Object o2 = mappedObject1.get("koordinat");
                                     ObjectMapper om2 = new ObjectMapper();
-                                    LinkedHashMap<String, Integer> mappedObject2 = om2.convertValue(o2, LinkedHashMap.class);
+                                    LinkedHashMap<String, Double> mappedObject2 = om2.convertValue(o2, LinkedHashMap.class);
                                     System.out.println("çıktı koordinat " + mappedObject2);
                                     park_list.put(info, mappedObject2);
 
@@ -137,8 +171,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         list_latlng = new LinkedHashMap<>();
         listItems.clear();
-        for (Map.Entry<String[], LinkedHashMap<String, Integer>> entry : myItems1.getAll_info().entrySet()) {
-            int[] latlng = Ints.toArray(entry.getValue().values());
+        for (Map.Entry<String[], LinkedHashMap<String, Double>> entry : myItems1.getAll_info().entrySet()) {
+            double[] latlng = Doubles.toArray(entry.getValue().values());
             list_latlng.put(entry.getKey()[0], new LatLng(latlng[0], latlng[1]));
             double distance = SphericalUtil.computeDistanceBetween(new LatLng(latlng[0], latlng[1]), new LatLng(latlng[0], latlng[1]));
 
@@ -171,15 +205,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
-        // Add a marker in Sydney and move the camera
-        LatLng samandıra, uskudar;
-        samandıra = new LatLng(41, 29.25);
-        mMap.addMarker(new MarkerOptions().position(samandıra).title("samandıra"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(samandıra, 15));
-
-        uskudar = new LatLng(41.03, 29.03);
-        mMap.addMarker(new MarkerOptions().position(uskudar).title("üsküdar"));
-
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
@@ -190,20 +215,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         uis.setZoomControlsEnabled(true);
 
         final LatLng[] guncel_koord = new LatLng[1];
-        final PolylineOptions[] options = {new PolylineOptions().add(samandıra).add(samandıra).width(5).color(Color.BLUE).visible(true).geodesic(true)};
-        final Polyline[] polylineFinal = {mMap.addPolyline(options[0])};
+        //final PolylineOptions[] options = {new PolylineOptions().add(samandıra).add(samandıra).width(5).color(Color.BLUE).visible(true).geodesic(true)};
+        //final Polyline[] polylineFinal = {mMap.addPolyline(options[0])};
+        final boolean[] once = {true};
         mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
             @Override
             public void onMyLocationChange(Location location) {
                 guncel_koord[0] = new LatLng(location.getLatitude(), location.getLongitude());
+                if (once[0]) {
+                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(guncel_koord[0], 15));
+                    for (String str : list_latlng.keySet())
+                        mMap.addMarker(new MarkerOptions().position(list_latlng.get(str)).title(str));
+                    once[0] = false;
+                }
 
-                polylineFinal[0].remove();
-                options[0] = new PolylineOptions().add(samandıra).add(guncel_koord[0]).width(5).color(Color.BLUE).visible(true).geodesic(true);
-                polylineFinal[0] = mMap.addPolyline(options[0]);
+                //polylineFinal[0].remove();
+                //options[0] = new PolylineOptions().add(samandıra).add(guncel_koord[0]).width(5).color(Color.BLUE).visible(true).geodesic(true);
+                //polylineFinal[0] = mMap.addPolyline(options[0]);
+
 
                 int count=0;
-                for (LinkedHashMap<String, Integer> i : myItems1.getAll_info().values()) {
-                    int[] latlng = Ints.toArray(i.values());
+                for (LinkedHashMap<String, Double> i : myItems1.getAll_info().values()) {
+                    double[] latlng = Doubles.toArray(i.values());
                     double distance = SphericalUtil.computeDistanceBetween(guncel_koord[0], new LatLng(latlng[0], latlng[1]));
 
                     listItems.get(count).setKm(distance);
@@ -211,6 +244,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     myAdapter.setMyItemsList(listItems);
                     listView.setAdapter(myAdapter);
                 }
+
             }
         });
 
@@ -322,4 +356,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        //getMenuInflater().inflate(R.menu.my_menu, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (actionBarDrawerToggle.onOptionsItemSelected(item))
+            return true;
+
+        return super.onOptionsItemSelected(item);
+    }
 }
