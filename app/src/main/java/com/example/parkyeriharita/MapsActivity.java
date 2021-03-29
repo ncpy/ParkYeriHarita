@@ -15,13 +15,15 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.SearchView;
 import android.widget.TextView;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,20 +43,18 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
+    android.widget.SearchView search_bar;
+    MyAdapter myAdapter;
     ListView listView;
     List<MyItems> listItems = new ArrayList<>();
     String park_adi, park_saat;
@@ -71,6 +71,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
+        search_bar = findViewById(R.id.search_bar);
+        search_bar.setFocusable(false);
+        search_bar.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                myAdapter.getFilter().filter(newText);
+                return true;
+            }
+
+        });
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();
 
@@ -125,15 +140,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             myItems2 = new MyItems(entry.getKey()[0], entry.getKey()[1], Integer.parseInt(entry.getKey()[2]), Integer.parseInt(entry.getKey()[3]), null);
             listItems.add(myItems2);
 
-            Set<String> h = entry.getValue().keySet();
-            System.out.println("hhh: "+h);
-
             int[] latlng = Ints.toArray(entry.getValue().values());
             latLngs_list.add(new LatLng(latlng[0], latlng[1]));
         }
 
 
-        MyAdapter myAdapter = new MyAdapter(listItems, this);
+        myAdapter = new MyAdapter(listItems, this);
         listView.setAdapter(myAdapter);
 
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -251,7 +263,45 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         @Override
         public Filter getFilter() {
-            return null;
+            return new Filter() {
+                @Override
+                protected FilterResults performFiltering(CharSequence constraint) {
+                    FilterResults filterResults = new FilterResults();
+
+                    if (constraint == null && constraint.length() == 0) {
+                        filterResults.count = myItemsList.size();
+                        filterResults.values = myItemsList;
+                    } else {
+                        String searchStr = constraint.toString().toLowerCase();
+                        List<MyItems> resultData = new ArrayList<>();
+
+                        for (MyItems i : myItemsList) {
+                            if (i.getName().toLowerCase().contains(searchStr))
+                                resultData.add(i);
+
+                            filterResults.count = resultData.size();
+                            filterResults.values = resultData;
+                        }
+
+                    }
+                    return filterResults;
+                }
+
+                @Override
+                protected void publishResults(CharSequence constraint, FilterResults results) {
+                    myItemsListFiltered = (List<MyItems>) results.values;
+                    notifyDataSetChanged();
+                }
+            };
+        }
+    }
+
+    public void hideKeyboard(View view) {
+        try {
+            InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            inputMethodManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
