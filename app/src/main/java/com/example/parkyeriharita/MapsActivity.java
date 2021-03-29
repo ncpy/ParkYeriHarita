@@ -1,42 +1,65 @@
 package com.example.parkyeriharita;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentActivity;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.location.Location;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.common.primitives.Ints;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
     ListView listView;
     List<MyItems> listItems = new ArrayList<>();
-
+    String park_adi, park_saat;
+    int park_bos_sayi, park_fiyat;
+    LinkedHashMap<String[], LinkedHashMap<String, Integer>> park_list = new LinkedHashMap<>();
     Context context = this;
 
     @Override
@@ -48,7 +71,71 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        db.collection("park")
+                .get()
+                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                        if (task.isSuccessful()) {
+                            for (QueryDocumentSnapshot document : Objects.requireNonNull(task.getResult())) {
+                                for (String yer : document.getData().keySet()) {
+                                    System.out.println("çıktı yer " + yer);
+
+                                    Object o1 = document.getData().get(yer);
+                                    ObjectMapper om1 = new ObjectMapper();
+                                    LinkedHashMap<String, Object> mappedObject1 = om1.convertValue(o1, LinkedHashMap.class);
+                                    park_adi = (String) mappedObject1.get(" adı");
+                                    park_saat = (String) mappedObject1.get("aktif saatler");
+                                    park_bos_sayi = ((Long) mappedObject1.get("boş yer sayısı")).intValue();
+                                    park_fiyat = ((Long) mappedObject1.get("0-1 saat")).intValue();
+                                    String[] info = new String[]{park_adi, park_saat, String.valueOf(park_bos_sayi), String.valueOf(park_fiyat)};
+                                    System.out.println("çıktı info " + Arrays.toString(info));
+
+                                    Object o2 = mappedObject1.get("koordinat");
+                                    ObjectMapper om2 = new ObjectMapper();
+                                    LinkedHashMap<String, Integer> mappedObject2 = om2.convertValue(o2, LinkedHashMap.class);
+                                    System.out.println("çıktı koordinat " + mappedObject2);
+                                    park_list.put(info, mappedObject2);
+
+                                }
+                            }
+                            after_database();
+
+                        } else {
+                            Log.w("çıktıı", "Error getting documents.", task.getException());
+                        }
+                    }
+                });
+
+    }
+
+    public void after_database() {
         listView = findViewById(R.id.listView);
+
+        MyItems myItems1, myItems2;
+        myItems1 = new MyItems(null, null, 0, 0, park_list);
+
+        //List<LatLng> latLngs = new ArrayList<>();
+        ArrayList<LatLng> latLngs_list = new ArrayList<>();
+
+        for (Map.Entry<String[], LinkedHashMap<String, Integer>> entry : myItems1.getAll_info().entrySet()) {
+            myItems2 = new MyItems(entry.getKey()[0], entry.getKey()[1], Integer.parseInt(entry.getKey()[2]), Integer.parseInt(entry.getKey()[3]), null);
+            listItems.add(myItems2);
+
+            Set<String> h = entry.getValue().keySet();
+            System.out.println("hhh: "+h);
+
+            int[] latlng = Ints.toArray(entry.getValue().values());
+            latLngs_list.add(new LatLng(latlng[0], latlng[1]));
+        }
+
+
+        MyAdapter myAdapter = new MyAdapter(listItems, this);
+        listView.setAdapter(myAdapter);
+
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -56,38 +143,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 startActivity(intent);
             }
         });
-
-        MyItems myItems1, myItems2;
-        LinkedHashMap<String, Integer> all_info = new LinkedHashMap<>();
-        all_info.put("Park A", 10);
-        all_info.put("Park B", 24);
-        all_info.put("Park C", 50);
-        all_info.put("Park D", 90);
-        all_info.put("Park E", 135);
-        all_info.put("Park F", 477);
-        all_info.put("Park G", 0);
-        all_info.put("Park H", 5);
-        myItems1 = new MyItems(null, 0, all_info);
-
-
-
-        for (String yer : myItems1.getAll_info().keySet()) {
-            //myItems2 = new MyItems(yer, null, null);
-            //listItems.add(myItems2);
-        }
-
-        for (Map.Entry<String, Integer> entry : all_info.entrySet()) {
-            System.out.println("key: "+entry.getKey());
-            System.out.println("value: "+entry.getValue());
-            myItems2 = new MyItems(entry.getKey(), entry.getValue(), null);
-            listItems.add(myItems2);
-        }
-
-
-        MyAdapter myAdapter = new MyAdapter(listItems, this);
-        listView.setAdapter(myAdapter);
-
-
     }
 
     /**
@@ -104,9 +159,38 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
 
         // Add a marker in Sydney and move the camera
-        LatLng istanbul = new LatLng(41, 29);
-        mMap.addMarker(new MarkerOptions().position(istanbul).title("İstanbul"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(istanbul));
+        LatLng samandıra, uskudar;
+        samandıra = new LatLng(41, 29.25);
+        mMap.addMarker(new MarkerOptions().position(samandıra).title("samandıra"));
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(samandıra, 15));
+
+        uskudar = new LatLng(41.03, 29.03);
+        mMap.addMarker(new MarkerOptions().position(uskudar).title("üsküdar"));
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        mMap.setMyLocationEnabled(true);
+        UiSettings uis = googleMap.getUiSettings();
+        uis.setCompassEnabled(true);
+        uis.setMyLocationButtonEnabled(true);
+        uis.setZoomControlsEnabled(true);
+
+        final LatLng[] guncel_koord = new LatLng[1];
+        final PolylineOptions[] options = {new PolylineOptions().add(samandıra).add(samandıra).width(5).color(Color.BLUE).visible(true).geodesic(true)};
+        final Polyline[] polylineFinal = {mMap.addPolyline(options[0])};
+        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
+            @Override
+            public void onMyLocationChange(Location location) {
+                guncel_koord[0] = new LatLng(location.getLatitude(), location.getLongitude());
+                System.out.println("konumum: " + guncel_koord[0]);
+
+                polylineFinal[0].remove();
+                options[0] = new PolylineOptions().add(samandıra).add(guncel_koord[0]).width(5).color(Color.BLUE).visible(true).geodesic(true);
+                polylineFinal[0] = mMap.addPolyline(options[0]);
+            }
+        });
+
     }
 
     public class MyAdapter extends BaseAdapter implements Filterable {
@@ -136,21 +220,24 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @SuppressLint("SetTextI18n")
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            @SuppressLint("ViewHolder")
+            @SuppressLint({"ViewHolder", "InflateParams"})
             View view1 = getLayoutInflater().inflate(R.layout.row_items, null);
 
             TextView tx_yer_ismi = view1.findViewById(R.id.tx_yer_ismi);
-            tx_yer_ismi.setText(myItemsListFiltered.get(position).name);
+            tx_yer_ismi.setText(myItemsListFiltered.get(position).getName());
 
             TextView tx_bos_yer_sayisi = view1.findViewById(R.id.tx_bos_yer_sayisi);
-            tx_bos_yer_sayisi.setText(myItemsListFiltered.get(position).bos_sayisi+"");
+            tx_bos_yer_sayisi.setText(myItemsListFiltered.get(position).getBos_sayisi()+"");
 
             TextView tx_km = view1.findViewById(R.id.tx_km);
-            //tx_km.setText(myItemsListFiltered.get(position));
 
             TextView tx_fee = view1.findViewById(R.id.tx_fee);
+            tx_fee.setText(myItemsListFiltered.get(position).getFiyat()+"");
+
             TextView tx_duration = view1.findViewById(R.id.tx_duration);
+
             TextView tx_time = view1.findViewById(R.id.tx_time);
+            tx_time.setText(myItemsListFiltered.get(position).getAktif_saat());
 
             ImageView imageView = view1.findViewById(R.id.imageView);
             imageView.setImageResource(R.drawable.park_entry);
@@ -158,7 +245,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             imageView2.setImageResource(R.drawable.car_32);
             ImageView imageView3 = view1.findViewById(R.id.imageView3);
             imageView3.setImageResource(R.drawable.car_ph_32);
-
 
             return view1;
         }
@@ -169,39 +255,4 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    public class MyItems implements Serializable {
-        private String name;
-        private int bos_sayisi;
-        private LinkedHashMap<String, Integer> all_info;
-
-        public MyItems(String name, int bos_sayisi, LinkedHashMap<String, Integer> all_info) {
-            this.name = name;
-            this.bos_sayisi = bos_sayisi;
-            this.all_info = all_info;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getBos_sayisi() {
-            return bos_sayisi;
-        }
-
-        public void setBos_sayisi(int desc) {
-            this.bos_sayisi = desc;
-        }
-
-        public LinkedHashMap<String, Integer> getAll_info() {
-            return all_info;
-        }
-
-        public void setAll_info(LinkedHashMap<String, Integer> all_info) {
-            this.all_info = all_info;
-        }
-    }
 }
