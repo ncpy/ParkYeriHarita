@@ -7,13 +7,15 @@ public class MyItems implements Serializable {
     private String name;
     private String aktif_saat;
     private int fiyat, bos_sayisi;
+    private double km;
     private LinkedHashMap<String[], LinkedHashMap<String, Integer>> all_info;
 
-    public MyItems(String name, String aktif_saat, int fiyat, int bos_sayisi, LinkedHashMap<String[], LinkedHashMap<String, Integer>> all_info) {
+    public MyItems(String name, String aktif_saat, int fiyat, int bos_sayisi, double km, LinkedHashMap<String[], LinkedHashMap<String, Integer>> all_info) {
         this.name = name;
         this.aktif_saat = aktif_saat;
         this.fiyat = fiyat;
         this.bos_sayisi = bos_sayisi;
+        this.km = km;
         this.all_info = all_info;
     }
 
@@ -49,6 +51,14 @@ public class MyItems implements Serializable {
         this.fiyat = fiyat;
     }
 
+    public double getKm() {
+        return km;
+    }
+
+    public void setKm(double km) {
+        this.km = km;
+    }
+
     public LinkedHashMap<String[], LinkedHashMap<String, Integer>> getAll_info() {
         return all_info;
     }
@@ -56,5 +66,4 @@ public class MyItems implements Serializable {
     public void setAll_info(LinkedHashMap<String[], LinkedHashMap<String, Integer>> all_info) {
         this.all_info = all_info;
     }
-
 }

@@ -42,6 +42,7 @@ import com.google.common.primitives.Ints;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.maps.android.SphericalUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,9 +58,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     MyAdapter myAdapter;
     ListView listView;
     List<MyItems> listItems = new ArrayList<>();
+    MyItems myItems1, myItems2;
     String park_adi, park_saat;
     int park_bos_sayi, park_fiyat;
     LinkedHashMap<String[], LinkedHashMap<String, Integer>> park_list = new LinkedHashMap<>();
+    LinkedHashMap<String, LatLng> list_latlng;
     Context context = this;
 
     @Override
@@ -130,27 +133,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void after_database() {
         listView = findViewById(R.id.listView);
 
-        MyItems myItems1, myItems2;
-        myItems1 = new MyItems(null, null, 0, 0, park_list);
+        myItems1 = new MyItems(null, null, 0, 0, 0, park_list);
 
-        //List<LatLng> latLngs = new ArrayList<>();
-        ArrayList<LatLng> latLngs_list = new ArrayList<>();
-
+        list_latlng = new LinkedHashMap<>();
+        listItems.clear();
         for (Map.Entry<String[], LinkedHashMap<String, Integer>> entry : myItems1.getAll_info().entrySet()) {
-            myItems2 = new MyItems(entry.getKey()[0], entry.getKey()[1], Integer.parseInt(entry.getKey()[2]), Integer.parseInt(entry.getKey()[3]), null);
-            listItems.add(myItems2);
-
             int[] latlng = Ints.toArray(entry.getValue().values());
-            latLngs_list.add(new LatLng(latlng[0], latlng[1]));
+            list_latlng.put(entry.getKey()[0], new LatLng(latlng[0], latlng[1]));
+            double distance = SphericalUtil.computeDistanceBetween(new LatLng(latlng[0], latlng[1]), new LatLng(latlng[0], latlng[1]));
+
+            myItems2 = new MyItems(entry.getKey()[0], entry.getKey()[1], Integer.parseInt(entry.getKey()[2]), Integer.parseInt(entry.getKey()[3]), distance, null);
+            listItems.add(myItems2);
         }
 
-
-        myAdapter = new MyAdapter(listItems, this);
+        myAdapter = new MyAdapter(listItems, MapsActivity.this);
         listView.setAdapter(myAdapter);
-
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
                 Intent intent = new Intent(context, SecondActivity.class);
                 startActivity(intent);
             }
@@ -195,11 +196,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onMyLocationChange(Location location) {
                 guncel_koord[0] = new LatLng(location.getLatitude(), location.getLongitude());
-                System.out.println("konumum: " + guncel_koord[0]);
 
                 polylineFinal[0].remove();
                 options[0] = new PolylineOptions().add(samandıra).add(guncel_koord[0]).width(5).color(Color.BLUE).visible(true).geodesic(true);
                 polylineFinal[0] = mMap.addPolyline(options[0]);
+
+                int count=0;
+                for (LinkedHashMap<String, Integer> i : myItems1.getAll_info().values()) {
+                    int[] latlng = Ints.toArray(i.values());
+                    double distance = SphericalUtil.computeDistanceBetween(guncel_koord[0], new LatLng(latlng[0], latlng[1]));
+
+                    listItems.get(count).setKm(distance);
+                    count++;
+                    myAdapter.setMyItemsList(listItems);
+                    listView.setAdapter(myAdapter);
+                }
             }
         });
 
@@ -224,12 +235,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return null;
         }
 
+        public void setMyItemsList(List<MyItems> myItemsList) {
+            this.myItemsList = myItemsList;
+            notifyDataSetChanged();
+        }
+
         @Override
         public long getItemId(int position) {
             return position;
         }
 
-        @SuppressLint("SetTextI18n")
+        @SuppressLint({"SetTextI18n", "DefaultLocale"})
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             @SuppressLint({"ViewHolder", "InflateParams"})
@@ -242,9 +258,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             tx_bos_yer_sayisi.setText(myItemsListFiltered.get(position).getBos_sayisi()+"");
 
             TextView tx_km = view1.findViewById(R.id.tx_km);
+            tx_km.setText(String.format("%.2f", myItemsListFiltered.get(position).getKm()/1000) + " km");
 
             TextView tx_fee = view1.findViewById(R.id.tx_fee);
-            tx_fee.setText(myItemsListFiltered.get(position).getFiyat()+"");
+            tx_fee.setText(myItemsListFiltered.get(position).getFiyat()+"₺");
 
             TextView tx_duration = view1.findViewById(R.id.tx_duration);
 
