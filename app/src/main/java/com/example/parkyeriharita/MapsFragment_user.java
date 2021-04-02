@@ -1,10 +1,12 @@
 package com.example.parkyeriharita;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBarDrawerToggle;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.Fragment;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -14,11 +16,12 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.InputMethodManager;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Filter;
@@ -37,10 +40,9 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.Polyline;
-import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
 import com.google.common.primitives.Doubles;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -55,16 +57,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+import static android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
 
-    private GoogleMap mMap;
+public class MapsFragment_user extends Fragment {
+
+    DrawerLayout drawerLayout2;
+    NavigationView navigationView2;
+    ActionBarDrawerToggle actionBarDrawerToggle2;
+
     android.widget.SearchView search_bar;
 
-    DrawerLayout drawerLayout;
-    NavigationView navView;
-    ActionBarDrawerToggle actionBarDrawerToggle;
-
-    MyAdapter myAdapter;
+    My_Adapter myAdapter;
     ListView listView;
     List<MyItems> listItems = new ArrayList<>();
     MyItems myItems1, myItems2;
@@ -72,27 +75,102 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     int park_bos_sayi, park_fiyat;
     LinkedHashMap<String[], LinkedHashMap<String, Double>> park_list = new LinkedHashMap<>();
     LinkedHashMap<String, LatLng> list_latlng;
-    Context context = this;
+
+    private OnMapReadyCallback callback = new OnMapReadyCallback() {
+
+        /**
+         * Manipulates the map once available.
+         * This callback is triggered when the map is ready to be used.
+         * This is where we can add markers or lines, add listeners or move the camera.
+         * In this case, we just add a marker near Sydney, Australia.
+         * If Google Play services is not installed on the device, the user will be prompted to
+         * install it inside the SupportMapFragment. This method will only be triggered once the
+         * user has installed Google Play services and returned to the app.
+         */
+        @Override
+        public void onMapReady(GoogleMap googleMap) {
+
+            if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return;
+            }
+            googleMap.setMyLocationEnabled(true);
+            UiSettings uis = googleMap.getUiSettings();
+            uis.setCompassEnabled(true);
+            uis.setMyLocationButtonEnabled(true);
+            uis.setZoomControlsEnabled(true);
+
+            final LatLng[] guncel_koord = new LatLng[1];
+            //final PolylineOptions[] options = {new PolylineOptions().add(samandıra).add(samandıra).width(5).color(Color.BLUE).visible(true).geodesic(true)};
+            //final Polyline[] polylineFinal = {mMap.addPolyline(options[0])};
+            final boolean[] once = {true};
+            googleMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
+                @Override
+                public void onMyLocationChange(Location location) {
+                    guncel_koord[0] = new LatLng(location.getLatitude(), location.getLongitude());
+                    if (once[0]) {
+                        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(guncel_koord[0], 15));
+                        try {
+                            for (String str : list_latlng.keySet())
+                                googleMap.addMarker(new MarkerOptions().position(list_latlng.get(str)).title(str));
+                        } catch (Exception ignored) {}
+                        once[0] = false;
+                    }
+
+                    //polylineFinal[0].remove();
+                    //options[0] = new PolylineOptions().add(samandıra).add(guncel_koord[0]).width(5).color(Color.BLUE).visible(true).geodesic(true);
+                    //polylineFinal[0] = mMap.addPolyline(options[0]);
+
+
+                    int count=0;
+                    for (LinkedHashMap<String, Double> i : myItems1.getAll_info().values()) {
+                        double[] latlng = Doubles.toArray(i.values());
+                        double distance = SphericalUtil.computeDistanceBetween(guncel_koord[0], new LatLng(latlng[0], latlng[1]));
+
+                        listItems.get(count).setKm(distance);
+                        count++;
+                        myAdapter.setMyItemsList(listItems);
+                        listView.setAdapter(myAdapter);
+                    }
+
+                }
+            });
+
+        }
+    };
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_maps_user, container, false);
+
+        drawerLayout2 = view.findViewById(R.id.drawerlayout2);
+        actionBarDrawerToggle2 = new ActionBarDrawerToggle(getActivity(), drawerLayout2, R.string.open, R.string.close);
+        navigationView2 = view.findViewById(R.id.navView2);
+
+        search_bar = view.findViewById(R.id.search_bar);
+        listView = view.findViewById(R.id.listView);
+
+
+        setHasOptionsMenu(true);
+        return view;
+    }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_maps);
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.map);
+        if (mapFragment != null) {
+            mapFragment.getMapAsync(callback);
+        }
 
-        drawerLayout = findViewById(R.id.drawerlayout);
-        actionBarDrawerToggle = new ActionBarDrawerToggle(this, drawerLayout, R.string.open, R.string.close);
-        drawerLayout.addDrawerListener(actionBarDrawerToggle);
-        actionBarDrawerToggle.syncState();
+        drawerLayout2.addDrawerListener(actionBarDrawerToggle2);
+        actionBarDrawerToggle2.syncState();
 
-        //getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        Objects.requireNonNull(((AppCompatActivity) Objects.requireNonNull(getActivity())).getSupportActionBar()).setDisplayHomeAsUpEnabled(true);
 
-        navView = findViewById(R.id.navView);
-        navView.setItemIconTintList(null);
-        navView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+        navigationView2.setItemIconTintList(null);
+        navigationView2.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem item) {
                 if (item.getItemId() == R.id.item_share) {
@@ -100,15 +178,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     share.setType("text/plain");
                     share.putExtra(Intent.EXTRA_TEXT, "merhaba"); // uyg. adresi (googlePlay)
                     startActivity(Intent.createChooser(share, "Gönderiyi paylaş !! "));
-                } else if (item.getItemId() == R.id.item_rate)
-                    Toast.makeText(getApplicationContext(), "..to Google Play", Toast.LENGTH_SHORT).show();
+
+                } else if (item.getItemId() == R.id.item_send_us) {
+                    Intent emailIntent = new Intent(Intent.ACTION_SEND);
+                    emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[]{"ncpyolcu@gmail.com"});
+                    emailIntent.setType("text/html");
+                    emailIntent.setPackage("com.google.android.gm");
+                    startActivity(Intent.createChooser(emailIntent, "E-mail Gönder"));
+
+                } else if (item.getItemId() == R.id.item_rate) {
+                    Toast.makeText(getActivity(), "..to Google Play", Toast.LENGTH_SHORT).show();
+                }
 
                 return true;
             }
         });
 
-
-        search_bar = findViewById(R.id.search_bar);
         search_bar.setFocusable(false);
         search_bar.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
@@ -118,7 +203,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                myAdapter.getFilter().filter(newText);
+                try {
+                    myAdapter.getFilter().filter(newText);
+                } catch (Exception ignored) {}
                 return true;
             }
 
@@ -162,11 +249,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
                 });
 
+
+        //Window w = getActivity().getWindow(); w.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        //getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+
+        super.onViewCreated(view, savedInstanceState);
+
     }
 
     public void after_database() {
-        listView = findViewById(R.id.listView);
-
         myItems1 = new MyItems(null, null, 0, 0, 0, park_list);
 
         list_latlng = new LinkedHashMap<>();
@@ -180,81 +271,33 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             listItems.add(myItems2);
         }
 
-        myAdapter = new MyAdapter(listItems, MapsActivity.this);
+        myAdapter = new My_Adapter(listItems);
         listView.setAdapter(myAdapter);
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 
-                Intent intent = new Intent(context, SecondActivity.class);
+                Intent intent = new Intent(getActivity(), PagesActivity.class);
                 startActivity(intent);
             }
         });
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (actionBarDrawerToggle2.onOptionsItemSelected(item)) {
+            return true;
         }
-        mMap.setMyLocationEnabled(true);
-        UiSettings uis = googleMap.getUiSettings();
-        uis.setCompassEnabled(true);
-        uis.setMyLocationButtonEnabled(true);
-        uis.setZoomControlsEnabled(true);
 
-        final LatLng[] guncel_koord = new LatLng[1];
-        //final PolylineOptions[] options = {new PolylineOptions().add(samandıra).add(samandıra).width(5).color(Color.BLUE).visible(true).geodesic(true)};
-        //final Polyline[] polylineFinal = {mMap.addPolyline(options[0])};
-        final boolean[] once = {true};
-        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
-            @Override
-            public void onMyLocationChange(Location location) {
-                guncel_koord[0] = new LatLng(location.getLatitude(), location.getLongitude());
-                if (once[0]) {
-                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(guncel_koord[0], 15));
-                    for (String str : list_latlng.keySet())
-                        mMap.addMarker(new MarkerOptions().position(list_latlng.get(str)).title(str));
-                    once[0] = false;
-                }
-
-                //polylineFinal[0].remove();
-                //options[0] = new PolylineOptions().add(samandıra).add(guncel_koord[0]).width(5).color(Color.BLUE).visible(true).geodesic(true);
-                //polylineFinal[0] = mMap.addPolyline(options[0]);
-
-
-                int count=0;
-                for (LinkedHashMap<String, Double> i : myItems1.getAll_info().values()) {
-                    double[] latlng = Doubles.toArray(i.values());
-                    double distance = SphericalUtil.computeDistanceBetween(guncel_koord[0], new LatLng(latlng[0], latlng[1]));
-
-                    listItems.get(count).setKm(distance);
-                    count++;
-                    myAdapter.setMyItemsList(listItems);
-                    listView.setAdapter(myAdapter);
-                }
-
-            }
-        });
-
+        return super.onOptionsItemSelected(item);
     }
 
-    public class MyAdapter extends BaseAdapter implements Filterable {
+
+    public class My_Adapter extends BaseAdapter implements Filterable {
         List<MyItems> myItemsList;
         List<MyItems> myItemsListFiltered;
 
-        public MyAdapter(List<MyItems> myItemsList, MapsActivity mapsActivity) {
+        public My_Adapter(List<MyItems> myItemsList) {
             this.myItemsList = myItemsList;
             this.myItemsListFiltered = myItemsList;
         }
@@ -345,28 +388,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             };
         }
-    }
-
-    public void hideKeyboard(View view) {
-        try {
-            InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-            inputMethodManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        //getMenuInflater().inflate(R.menu.my_menu, menu);
-        return super.onCreateOptionsMenu(menu);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (actionBarDrawerToggle.onOptionsItemSelected(item))
-            return true;
-
-        return super.onOptionsItemSelected(item);
     }
 }
